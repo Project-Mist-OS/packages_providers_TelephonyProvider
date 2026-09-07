@@ -520,14 +520,13 @@ public class MmsSmsProvider extends ContentProvider {
                     callingPackage + ";MmsSmsProvider.query;" + uri, true);
         }
         Cursor cursor = null;
-        Cursor emptyCursor = new MatrixCursor((projection == null) ?
-                (new String[] {}) : projection);
+        String[] emptyProjection = projection == null ? new String[0] : projection;
         final int match = URI_MATCHER.match(uri);
         switch (match) {
             case URI_COMPLETE_CONVERSATIONS:
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -552,7 +551,7 @@ public class MmsSmsProvider extends ContentProvider {
                     if (selectionBySubIds == null) {
                         // No subscriptions associated with user, return empty cursor.
                         Log.d(LOG_TAG, "URI_CONVERSATIONS - subId not associated with user.");
-                        return emptyCursor;
+                        return new MatrixCursor(emptyProjection, 0);
                     }
                     selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -562,7 +561,7 @@ public class MmsSmsProvider extends ContentProvider {
                 } else {
                     if (selectionBySubIds == null) {
                         // No subscriptions associated with user, return empty cursor.
-                        return emptyCursor;
+                        return new MatrixCursor(emptyProjection, 0);
                     }
                     selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -574,7 +573,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_CONVERSATIONS_MESSAGES:
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -586,7 +585,7 @@ public class MmsSmsProvider extends ContentProvider {
                 if (selectionBySubIds == null) {
                     Log.d(LOG_TAG,
                             "URI_CONVERSATIONS_RECIPIENTS - subId not associated with user.");
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -597,7 +596,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_CONVERSATIONS_SUBJECT:
                 if (selectionBySubIds == null) {
                     Log.d(LOG_TAG, "URI_CONVERSATIONS_SUBJECT - subId not associated with user.");
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -608,7 +607,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_MESSAGES_BY_PHONE:
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return emptyCursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -624,7 +623,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_CANONICAL_ADDRESS: {
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
                 if (Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages) {
@@ -648,7 +647,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_CANONICAL_ADDRESSES:
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
                 if (Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages) {
@@ -675,11 +674,11 @@ public class MmsSmsProvider extends ContentProvider {
                 // restrict untrusted apps, this OTP filter check is performed unconditionally as
                 // a safety measure to ensure security even if the flag is disabled.
                 if (!TextUtils.isEmpty(otpFilter)) {
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 if (selectionBySubIds == null) {
                     Log.d(LOG_TAG, "URI_CONVERSATIONS_SUGGEST - subId not associated with user.");
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
 
                 SEARCH_STRING[0] = uri.getQueryParameter("pattern") + '*' ;
@@ -742,7 +741,7 @@ public class MmsSmsProvider extends ContentProvider {
 
                 if (selectionBySubIds == null) {
                     Log.d(LOG_TAG, "URI_SEARCH - subId not associated with user.");
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
 
                 String searchString = uri.getQueryParameter("pattern") + "*";
@@ -776,7 +775,7 @@ public class MmsSmsProvider extends ContentProvider {
                 }
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 // In PendingMessages table, SUBSCRIPTION_ID column name is pending_sub_id.
                 selectionBySubIds = "pending_" + selectionBySubIds;
@@ -793,7 +792,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_UNDELIVERED_MSG: {
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -804,7 +803,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_DRAFT: {
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -824,7 +823,7 @@ public class MmsSmsProvider extends ContentProvider {
 
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 
@@ -835,7 +834,7 @@ public class MmsSmsProvider extends ContentProvider {
             case URI_FIRST_LOCKED_MESSAGE_ALL: {
                 if (selectionBySubIds == null) {
                     // No subscriptions associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
                 selection = DatabaseUtils.concatenateWhere(selection, selectionBySubIds);
 

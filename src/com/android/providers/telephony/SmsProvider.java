@@ -318,8 +318,7 @@ public class SmsProvider extends ContentProvider {
             return null;
         }
 
-        Cursor emptyCursor = new MatrixCursor((projectionIn == null) ?
-                (new String[] {}) : projectionIn);
+        String[] emptyProjection = projectionIn == null ? new String[0] : projectionIn;
 
         // Generate the body of the query.
         int match = sURLMatcher.match(url);
@@ -482,7 +481,7 @@ public class SmsProvider extends ContentProvider {
                 if (!ProviderUtil.allowInteractingWithEntryOfSubscription(getContext(),
                         subId, callerUserHandle)) {
                     // If subId is not associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
 
                 Cursor ret = getAllMessagesFromIcc(subId);
@@ -510,7 +509,7 @@ public class SmsProvider extends ContentProvider {
                 if (!ProviderUtil.allowInteractingWithEntryOfSubscription(getContext(),
                         subId, callerUserHandle)) {
                     // If subId is not associated with user, return empty cursor.
-                    return emptyCursor;
+                    return new MatrixCursor(emptyProjection, 0);
                 }
 
                 Cursor ret = getSingleMessageFromIcc(subId, messageIndex);
@@ -543,12 +542,12 @@ public class SmsProvider extends ContentProvider {
             if (selectionBySubIds == null && selectionByEmergencyNumbers == null) {
                 // No subscriptions associated with user
                 // and no emergency numbers return empty cursor.
-                return emptyCursor;
+                return new MatrixCursor(emptyProjection, 0);
             }
         } else {
             if (selectionBySubIds == null) {
                 // No subscriptions associated with user return empty cursor.
-                return emptyCursor;
+                return new MatrixCursor(emptyProjection, 0);
             }
         }
 

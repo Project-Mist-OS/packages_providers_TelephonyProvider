@@ -4948,7 +4948,6 @@ public class TelephonyProvider extends ContentProvider
     private synchronized Cursor getSubscriptionMatchingAPNListSynchronized(
             SQLiteQueryBuilder qb, String[] projectionIn, String selection, String[] selectionArgs,
             String sort, int subId) {
-        Cursor ret;
         Context context = getContext();
         final TelephonyManager tm = ((TelephonyManager) context
                 .getSystemService(Context.TELEPHONY_SERVICE))
@@ -4968,115 +4967,96 @@ public class TelephonyProvider extends ContentProvider
         qb.appendWhereStandalone(NUMERIC + " = '" + mccmnc + "' OR " +
                 CARRIER_ID + " = '" + carrierId + "'");
 
-        ret = qb.query(db, null, selection, selectionArgs, null, null, sort);
-        if (ret == null) {
-            loge("subId:" + subId + " query current APN but cursor is null.");
-            return null;
-        }
+        String[] columnNames;
+        List<List<String>> currentRows = new ArrayList<>();
+        List<List<String>> parentRows = new ArrayList<>();
+        List<List<String>> carrierIdRows = new ArrayList<>();
+        List<List<String>> carrierIdNonMatchingMNORows = new ArrayList<>();
 
-        if (DBG) log("subId:" + subId + " mccmnc=" + mccmnc + " carrierId=" + carrierId +
-                ", match current APN size:  " + ret.getCount());
-
-        String[] columnNames = projectionIn != null ? projectionIn : ret.getColumnNames();
-        MatrixCursor currentCursor = new MatrixCursor(columnNames);
-        MatrixCursor parentCursor = new MatrixCursor(columnNames);
-        MatrixCursor carrierIdCursor = new MatrixCursor(columnNames);
-        MatrixCursor carrierIdNonMatchingMNOCursor = new MatrixCursor(columnNames);
-
-        int numericIndex = ret.getColumnIndex(NUMERIC);
-        int mvnoIndex = ret.getColumnIndex(MVNO_TYPE);
-        int mvnoDataIndex = ret.getColumnIndex(MVNO_MATCH_DATA);
-        int carrierIdIndex = ret.getColumnIndex(CARRIER_ID);
-
-        // Separate the result into MatrixCursor
-        while (ret.moveToNext()) {
-            List<String> data = new ArrayList<>();
-            for (String column : columnNames) {
-                data.add(ret.getString(ret.getColumnIndex(column)));
+        try (Cursor ret = qb.query(db, null, selection, selectionArgs, null, null, sort)) {
+            if (ret == null) {
+                loge("subId:" + subId + " query current APN but cursor is null.");
+                return null;
             }
 
-            boolean isCurrentSimOperator = false;
-            if (!TextUtils.isEmpty(ret.getString(numericIndex))) {
-                final long identity = Binder.clearCallingIdentity();
-                try {
-                    isCurrentSimOperator = tm.matchesCurrentSimOperator(
-                            ret.getString(numericIndex),
-                            getMvnoTypeIntFromString(ret.getString(mvnoIndex)),
-                            ret.getString(mvnoDataIndex));
-                } finally {
-                    Binder.restoreCallingIdentity(identity);
+            if (DBG) log("subId:" + subId + " mccmnc=" + mccmnc + " carrierId=" + carrierId +
+                    ", match current APN size:  " + ret.getCount());
+
+            columnNames = projectionIn != null ? projectionIn : ret.getColumnNames();
+
+            int numericIndex = ret.getColumnIndex(NUMERIC);
+            int mvnoIndex = ret.getColumnIndex(MVNO_TYPE);
+            int mvnoDataIndex = ret.getColumnIndex(MVNO_MATCH_DATA);
+            int carrierIdIndex = ret.getColumnIndex(CARRIER_ID);
+
+            // Separate matching rows by APN type.
+            while (ret.moveToNext()) {
+                List<String> data = new ArrayList<>();
+                for (String column : columnNames) {
+                    data.add(ret.getString(ret.getColumnIndex(column)));
+                }
+
+                boolean isCurrentSimOperator = false;
+                if (!TextUtils.isEmpty(ret.getString(numericIndex))) {
+                    final long identity = Binder.clearCallingIdentity();
+                    try {
+                        isCurrentSimOperator = tm.matchesCurrentSimOperator(
+                                ret.getString(numericIndex),
+                                getMvnoTypeIntFromString(ret.getString(mvnoIndex)),
+                                ret.getString(mvnoDataIndex));
+                    } finally {
+                        Binder.restoreCallingIdentity(identity);
+                    }
+                }
+
+                boolean isMVNOAPN = !TextUtils.isEmpty(ret.getString(numericIndex))
+                        && isCurrentSimOperator;
+                boolean isMNOAPN = !TextUtils.isEmpty(ret.getString(numericIndex))
+                        && ret.getString(numericIndex).equals(mccmnc)
+                        && TextUtils.isEmpty(ret.getString(mvnoIndex));
+                boolean isCarrierIdAPN = !TextUtils.isEmpty(ret.getString(carrierIdIndex))
+                        && ret.getString(carrierIdIndex).equals(String.valueOf(carrierId))
+                        && carrierId != TelephonyManager.UNKNOWN_CARRIER_ID;
+
+                if (isMVNOAPN) {
+                    // 1. The APN that query based on legacy SIM MCC/MCC and MVNO
+                    currentRows.add(data);
+                } else if (isMNOAPN) {
+                    // 2. The APN that query based on SIM MCC/MNC
+                    parentRows.add(data);
+                } else if (isCarrierIdAPN) {
+                    // The APN that query based on carrier Id (not include the MVNO or MNO APN)
+                    if (TextUtils.isEmpty(ret.getString(numericIndex))) {
+                        carrierIdRows.add(data);
+                    } else {
+                        carrierIdNonMatchingMNORows.add(data);
+                    }
                 }
             }
-
-            boolean isMVNOAPN = !TextUtils.isEmpty(ret.getString(numericIndex))
-                    && isCurrentSimOperator;
-            boolean isMNOAPN = !TextUtils.isEmpty(ret.getString(numericIndex))
-                    && ret.getString(numericIndex).equals(mccmnc)
-                    && TextUtils.isEmpty(ret.getString(mvnoIndex));
-            boolean isCarrierIdAPN = !TextUtils.isEmpty(ret.getString(carrierIdIndex))
-                    && ret.getString(carrierIdIndex).equals(String.valueOf(carrierId))
-                    && carrierId != TelephonyManager.UNKNOWN_CARRIER_ID;
-
-            if (isMVNOAPN) {
-                // 1. The APN that query based on legacy SIM MCC/MCC and MVNO
-                currentCursor.addRow(data);
-            } else if (isMNOAPN) {
-                // 2. The APN that query based on SIM MCC/MNC
-                parentCursor.addRow(data);
-            } else if (isCarrierIdAPN) {
-                // The APN that query based on carrier Id (not include the MVNO or MNO APN)
-                if (TextUtils.isEmpty(ret.getString(numericIndex))) {
-                    carrierIdCursor.addRow(data);
-                } else {
-                    carrierIdNonMatchingMNOCursor.addRow(data);
-                }
-            }
         }
-        ret.close();
 
-        MatrixCursor result;
-        if (currentCursor.getCount() > 0) {
-            if (DBG) log("match MVNO APN: " + currentCursor.getCount());
-            result = currentCursor;
-        } else if (parentCursor.getCount() > 0) {
-            if (DBG) log("match MNO APN: " + parentCursor.getCount());
-            result = parentCursor;
+        List<List<String>> resultRows;
+        if (!currentRows.isEmpty()) {
+            if (DBG) log("match MVNO APN: " + currentRows.size());
+            resultRows = currentRows;
+        } else if (!parentRows.isEmpty()) {
+            if (DBG) log("match MNO APN: " + parentRows.size());
+            resultRows = parentRows;
         } else {
             if (DBG) {
                 log("No MVNO, MNO and no MCC/MNC match, but we have match/matches with the " +
-                        "same carrier id, count: " + carrierIdNonMatchingMNOCursor.getCount());
+                        "same carrier id, count: " + carrierIdNonMatchingMNORows.size());
             }
-            result = carrierIdNonMatchingMNOCursor;
+            resultRows = carrierIdNonMatchingMNORows;
         }
 
-        if (DBG) log("match carrier id APN: " + carrierIdCursor.getCount());
-        appendCursorData(result, carrierIdCursor);
+        if (DBG) log("match carrier id APN: " + carrierIdRows.size());
+        resultRows.addAll(carrierIdRows);
+        MatrixCursor result = new MatrixCursor(columnNames, resultRows.size());
+        for (List<String> row : resultRows) {
+            result.addRow(row);
+        }
         return result;
-    }
-
-    private static void appendCursorData(@NonNull MatrixCursor from, @NonNull MatrixCursor to) {
-        while (to.moveToNext()) {
-            List<Object> data = new ArrayList<>();
-            for (String column : to.getColumnNames()) {
-                int index = to.getColumnIndex(column);
-                switch (to.getType(index)) {
-                    case Cursor.FIELD_TYPE_INTEGER:
-                        data.add(to.getInt(index));
-                        break;
-                    case Cursor.FIELD_TYPE_FLOAT:
-                        data.add(to.getFloat(index));
-                        break;
-                    case Cursor.FIELD_TYPE_BLOB:
-                        data.add(to.getBlob(index));
-                        break;
-                    case Cursor.FIELD_TYPE_STRING:
-                    case Cursor.FIELD_TYPE_NULL:
-                        data.add(to.getString(index));
-                        break;
-                }
-            }
-            from.addRow(data);
-        }
     }
 
     @Override
